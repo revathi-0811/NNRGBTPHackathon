@@ -1,6 +1,6 @@
 const cds=require('@sap/cds')
 module.exports = cds.service.impl(async function () {
-    const { States, Business_Partner } = this.entities;
+    const { States, Business_Partner, Product} = this.entities;
     this.on("READ", Business_Partner, async (req) => {
         const results = await cds.run(req.query);
         return results;
@@ -25,6 +25,40 @@ module.exports = cds.service.impl(async function () {
         }
         
       });
+
+      this.before(["CREATE", "UPDATE"], Business_Partner, async (req) => {
+        const gst = req.data.gst_no;
+        const is_gstn_registered = req.data.is_gstn_registered;
+        if (is_gstn_registered == true && gst == null) {
+          req.error({
+            code: "INVALID_GST_NO",
+            message: "Enter gst registered number please",
+            target: "is_gstn_registered",
+          });
+        }
+        const results = await cds
+          .transaction(req)
+          .run(SELECT.from(Business_Partner));
+        const count = results.length;
+    
+        req.data.bp_no = count+1;
+    });
+    
+
+      
+    this.before(["CREATE"], Product, async (req) => {
+      const sellPrice = req.data.sellPrice ;
+      const costPrice = req.data.costPrice;
+  
+      if (sellPrice < costPrice) {
+          req.error({
+              code: "INVALID_SELL PRICE",
+              message: "Product Sell Price cannot be less than Cost Price",
+              target: "sell_price"
+          });
+      }
+  });
+  
       this.on('READ',States,async(req)=>{
         genders=[
             {"code":"TS","description":"Telangana"},
@@ -33,5 +67,6 @@ module.exports = cds.service.impl(async function () {
         ]
         genders.$count=genders.length
         return genders;
-    })
-})
+    })
+
+});
